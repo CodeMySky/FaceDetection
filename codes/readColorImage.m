@@ -1,3 +1,3 @@
-function greyScaleImage = readColorImage(file)
-colorImage = imread(file);
-greyScaleImage = squeeze(mean(colorImage,3));
+function [greyScaleImage,rawImage] = readColorImage(file)
+rawImage = imread(file);
+greyScaleImage = squeeze(mean(rawImage,3));
