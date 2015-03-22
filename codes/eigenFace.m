@@ -1,5 +1,3 @@
-function face = eigenFace(folder)
-imgMatrix = readAllImages(folder);
-[U,S,V] = svds(imgMatrix, 1);
-eigenface = U;
-face = reshape(eigenface,[64 64]);
+function [face, nrows, ncols] = eigenFace(folder, nFace)
+[imageMatrix, nrows, ncols] = readAllImages(folder);
+[face,~,~] = svds(imageMatrix, nFace);

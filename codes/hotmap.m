@@ -2,7 +2,6 @@ function map = hotmap(image, eigenFace)
 eigenFace= eigenFace/norm(eigenFace(:));
 [P, Q] = size(image);
 [N, M] = size(eigenFace);
-map = zeros(P-N, Q-M);
 
 %pixelsinpatch = N * M; %The size of the eigenface is N x M.
 %first compute the integral image
@@ -23,3 +22,4 @@ tmpim = conv2(image, rot90(eigenFace,2));
 convolvedimage = tmpim(N:end, M:end);
 sumE = sum(eigenFace(:));
 map = convolvedimage - sumE * patchmeansofImage(1:size(convolvedimage,1),1:size(convolvedimage,2));
+map = map(1:P-N, 1:Q-M);

@@ -1,6 +1,9 @@
-function [img,nrows,ncols] = readGreyScaleImage(imagefile)
-img = double(imread(imagefile));
+function [image, nrows, ncols] = readGreyScaleImage(imagefile)
+%image = double(imread(imagefile));
+image = double(histeq(imread(imagefile)));
 [nrows, ncols] = size(image);
-img = img(:);
-img = img - mean(img);
-img = img / norm(img);
+image = image(:);
+if mean(image) ~= 0
+    image = image - min(min(image));
+    image = image / norm(image);
+end
