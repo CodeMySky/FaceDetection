@@ -12,23 +12,22 @@ classdef Classifier < handle
         classifiers;
         featureMatrix;
         trainLabels;
+        eigenFaces;
+        nRows;
+        nCols;
+        useResidual = 0;
     end
     
     methods
         function obj = Classifier(trainingFolder)
             % read in training set
-            [trainingFace, nRowsTrain, nColsTrain] = readAllImages([trainingFolder,'/face']);
+            [trainingFace, obj.nRows, obj.nCols] = readAllImages([trainingFolder,'/face']);
             trainingNonFace = readAllImages([trainingFolder,'/non-face']);
             trainingSet = [trainingFace, trainingNonFace];
             obj.nTraining = length(trainingSet);
             
             % prepare eigen faces
-            % TODO: replace eigenface using training face
-            [eigenfaces, nRowsEigen, nColsEigen] = eigenFace('lfw1000', obj.nFeature);
-            resizedEigenFaces = zeros(nRowsTrain * nColsTrain, obj.nFeature - 1);
-            for i=1:obj.nFeature -1
-                resizedEigenFaces(:,i) = resize(eigenfaces(:,i), [nRowsEigen, nColsEigen], [nRowsTrain, nColsTrain]);
-            end
+            [obj.eigenFaces] = eigenFace([trainingFolder,'/face'], obj.nFeature);
             
             % initialze features and labels
             obj.featureMatrix = zeros(obj.nTraining, obj.nFeature);
@@ -43,15 +42,17 @@ classdef Classifier < handle
             obj.classifiers = zeros(obj.nFeature,1);
             
             % initial distribution with 1/N
-            for i = 1 : obj.nFeature - 1
-                obj.featureMatrix(:, i) = resizedEigenFaces(:,i)' * trainingSet;
-                trainingSet = trainingSet - (obj.featureMatrix(:,i) * resizedEigenFaces(:,i)')';
+            for i = 1 : (obj.nFeature  - obj.useResidual)
+                obj.featureMatrix(:, i) = obj.eigenFaces(:,i)' * trainingSet;
+                trainingSet = trainingSet - (obj.featureMatrix(:,i) * obj.eigenFaces(:,i)')';
             end
             
-            obj.featureMatrix(:,obj.nFeature) = sum(trainingSet.^2)/size(obj.featureMatrix,1);
+            if (obj.useResidual)
+                obj.featureMatrix(:,obj.nFeature) = sum(trainingSet.^2)/(obj.nRows* obj.nCols);
+            end
         end
         
-        function obj = fit(obj)
+        function fit(obj)
             % Initialize distribution as equally distributed
             distribution = ones(obj.nTraining, 1) / obj.nTraining;
             
@@ -111,9 +112,34 @@ classdef Classifier < handle
                 distribution = distribution / sum(distribution);
             end
         end
+        
+        function isFace = predict(obj, testImage)
+            %testImage = imresize(testImage, obj.nRows, obj.nCols);
+            imageVector = testImage(:);
+            features = zeros(1,obj.nFeature);
+            for i = 1 : (obj.nFeature - obj.useResidual)
+                features(1, i) = obj.eigenFaces(:,i)' * imageVector;
+                imageVector = imageVector - (features(1,i) * obj.eigenFaces(:,i)')';
+            end
+            if (obj.useResidual)
+                features(1,obj.nFeature) = sum(imageVector.^2)/length(imageVector);
+            end
+            score = 0;
+            for i = 1 : obj.nClassifier
+                classifier = obj.classifiers(i);
+                threshold = obj.thresholds(i);
+                sign = obj.signs(i);
+                weight = obj.weights(i);
+                prediction = (2 * (features(1,classifier) > threshold) - 1) * sign;
+                score = score + prediction * weight;
+            end
+            isFace = score;
+        end
+        
         function set.nFeature(obj,value)
             obj.nFeature = value;
         end
+        
         function set.nClassifier(obj,value)
             obj.nClassifier = value;
         end
