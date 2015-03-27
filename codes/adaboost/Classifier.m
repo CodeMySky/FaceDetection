@@ -3,9 +3,11 @@ classdef Classifier < handle
     %   Detailed explanation goes here
     
     properties
-        nFeature = 10;
-        nClassifier = 10;
+        nFeature = 25;
+        nClassifier = 20;
+        threshHold = -2;
         nTraining;
+        errors;
         weights;
         signs;
         thresholds;
@@ -15,7 +17,10 @@ classdef Classifier < handle
         eigenFaces;
         nRows;
         nCols;
-        useResidual = 0;
+        nFace;
+        nNonFace;
+        trainingSet;
+        useResidual = 1;
     end
     
     methods
@@ -23,36 +28,50 @@ classdef Classifier < handle
             % read in training set
             [trainingFace, obj.nRows, obj.nCols] = readAllImages([trainingFolder,'/face']);
             trainingNonFace = readAllImages([trainingFolder,'/non-face']);
-            trainingSet = [trainingFace, trainingNonFace];
-            obj.nTraining = length(trainingSet);
+            %equalSize = min([length(trainingFace),length(trainingNonFace)]);
+            %trainingFace = trainingFace(:,1:equalSize);
+            %trainingNonFace = trainingNonFace(:,1:equalSize);
+            obj.nFace = length(trainingFace);
+            obj.nNonFace = length(trainingNonFace);
+            
+            obj.trainingSet = [trainingFace, trainingNonFace];
+            obj.nTraining = obj.nFace + obj.nNonFace;
             
             % prepare eigen faces
-            [obj.eigenFaces] = eigenFace([trainingFolder,'/face'], obj.nFeature);
+%             [obj.eigenFaces] = eigenFace([trainingFolder,'/face'], obj.nFeature);
+            [eigenfaces, nRowsEigen, nColsEigen] = eigenFace('lfw1000', obj.nFeature);
+            obj.eigenFaces = zeros(obj.nRows * obj.nCols, obj.nFeature);
+            for i=1:obj.nFeature
+                obj.eigenFaces(:,i) = resize(eigenfaces(:,i), [nRowsEigen, nColsEigen], [obj.nRows, obj.nCols]);
+            end
             
-            % initialze features and labels
+            
+        end
+        function decompose(obj)
             obj.featureMatrix = zeros(obj.nTraining, obj.nFeature);
             
-            nFace = length(trainingFace);
-            nNonFace = length(trainingNonFace);
-            obj.trainLabels = [ones(nFace, 1); -ones(nNonFace,1)];
             
-            obj.weights = zeros(obj.nFeature,1);
-            obj.signs = ones(obj.nFeature, 1);
-            obj.thresholds = zeros(obj.nFeature,1);
-            obj.classifiers = zeros(obj.nFeature,1);
-            
-            % initial distribution with 1/N
+            trainingMatrix = obj.trainingSet(1:end,1:end);
             for i = 1 : (obj.nFeature  - obj.useResidual)
-                obj.featureMatrix(:, i) = obj.eigenFaces(:,i)' * trainingSet;
-                trainingSet = trainingSet - (obj.featureMatrix(:,i) * obj.eigenFaces(:,i)')';
+                obj.featureMatrix(:, i) = pinv(obj.eigenFaces(:,i)) * trainingMatrix;
+                expressablePart = obj.eigenFaces(:,i) * obj.featureMatrix(:, i)';
+                trainingMatrix = trainingMatrix - expressablePart;
             end
             
             if (obj.useResidual)
-                obj.featureMatrix(:,obj.nFeature) = sum(trainingSet.^2)/(obj.nRows* obj.nCols);
+                obj.featureMatrix(:,obj.nFeature) = sum(trainingMatrix.^2)/(obj.nRows* obj.nCols);
             end
         end
         
         function fit(obj)
+            obj.trainLabels = [ones(obj.nFace, 1); -ones(obj.nNonFace,1)];
+            obj.weights = zeros(obj.nClassifier,1);
+            obj.errors = zeros(obj.nClassifier,1);
+            obj.signs = ones(obj.nClassifier, 1);
+            obj.thresholds = zeros(obj.nClassifier,1);
+            obj.classifiers = zeros(obj.nClassifier,1);
+            
+            
             % Initialize distribution as equally distributed
             distribution = ones(obj.nTraining, 1) / obj.nTraining;
             
@@ -74,11 +93,11 @@ classdef Classifier < handle
                         threshold = minValue + delta / 50 * k;
                         sign = 1;
                         % predict using this threshold, +1/-1
-                        prediction = 2 * (featureValues > threshold) - 1;
+                        prediction = 2 * (featureValues >= threshold) - 1;
                         % select out wrong ones
-                        errors = (prediction .* obj.trainLabels) < 0;
+                        errorOnes = (prediction .* obj.trainLabels) < 0;
                         % accumulate the error rate for compare
-                        errorRate =  sum(errors .* distribution);
+                        errorRate =  sum(errorOnes .* distribution);
                         
                         % reverse the result if get wrong on more than 50%.
                         if errorRate > 0.5
@@ -100,6 +119,7 @@ classdef Classifier < handle
                 end
                 % we selected out the best feature.
                 alpha = log((1-bestErrorRate)/bestErrorRate)/2;
+                obj.errors(i) = bestErrorRate;
                 obj.weights(i) = alpha;
                 obj.signs(i) = bestSign;
                 obj.thresholds(i) = bestThreshold;
@@ -118,8 +138,9 @@ classdef Classifier < handle
             imageVector = testImage(:);
             features = zeros(1,obj.nFeature);
             for i = 1 : (obj.nFeature - obj.useResidual)
-                features(1, i) = obj.eigenFaces(:,i)' * imageVector;
-                imageVector = imageVector - (features(1,i) * obj.eigenFaces(:,i)')';
+                features(1, i) = pinv(obj.eigenFaces(:,i)) * imageVector;
+                expressablePart = obj.eigenFaces(:,i) * features(1, i)';
+                imageVector = imageVector - expressablePart;
             end
             if (obj.useResidual)
                 features(1,obj.nFeature) = sum(imageVector.^2)/length(imageVector);
@@ -130,10 +151,10 @@ classdef Classifier < handle
                 threshold = obj.thresholds(i);
                 sign = obj.signs(i);
                 weight = obj.weights(i);
-                prediction = (2 * (features(1,classifier) > threshold) - 1) * sign;
+                prediction = (2 * (features(1,classifier) >= threshold) - 1) * sign;
                 score = score + prediction * weight;
             end
-            isFace = score;
+            isFace = 2*(score > obj.threshHold)-1;
         end
         
         function set.nFeature(obj,value)

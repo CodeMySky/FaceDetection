@@ -1,12 +1,9 @@
-function [imageMatrix, nrows, ncols]  = readAllImages(folder, num)
+function [imageMatrix, nrows, ncols]  = readAllImages(folder)
 imagePaths = dir([folder,'/*.pgm']);
 [nextImage, nrows, ncols] = readGreyScaleImage([folder,'/',imagePaths(1).name]);
 imageMatrix = zeros(nrows * ncols, length(imagePaths));
 imageMatrix(:,1) = nextImage;
-if isEmpty(num)
-    num = length(imagePaths);
-end
-for i = 2:num
+for i = 2:length(imagePaths)
     nextImage = readGreyScaleImage([folder,'/',imagePaths(i).name]);
     imageMatrix(:,i) = nextImage;
 end
