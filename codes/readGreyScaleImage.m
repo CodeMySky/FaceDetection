@@ -4,6 +4,6 @@ image = double(histeq(imread(imagefile)));
 [nrows, ncols] = size(image);
 image = image(:);
 if mean(image) ~= 0
-    image = image - min(min(image));
+    image = image - mean(image(:));
     image = image / norm(image);
 end
