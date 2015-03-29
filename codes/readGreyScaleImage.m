@@ -4,8 +4,9 @@ image = double(histeq(imread(imagefile)));
 [nrows, ncols] = size(image);
 image = image(:);
 image = image - mean(image(:));
-if (norm(image(:)) ~= 0)
-    image = image / norm(image(L));
+n = norm(image(:));
+if n ~= 0
+    image = image / n;
 else
-    image = ones(nrows,ncols)/(nrows*ncols);
+    image = ones(nrows*ncols,1)/(nrows*ncols);
 end
