@@ -3,7 +3,10 @@ function [image, nrows, ncols] = readGreyScaleImage(imagefile)
 image = double(histeq(imread(imagefile)));
 [nrows, ncols] = size(image);
 image = image(:);
-if mean(image) ~= 0
-    image = image - min(min(image));
-    image = image / norm(image);
+image = image - mean(image(:));
+n = norm(image(:));
+if n ~= 0
+    image = image / n;
+else
+    image = ones(nrows*ncols,1)/(nrows*ncols);
 end
