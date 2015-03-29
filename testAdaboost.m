@@ -1,6 +1,5 @@
 testFace = readAllImages('BoostingData/test/face');
 testNonFace = readAllImages('BoostingData/test/non-face');
-testNonFace = [];
 c = Classifier('BoostingData/train/');
 % equalSize = min([length(testFace),length(testNonFace)]);
 % testFace = testFace(:,1:equalSize);
